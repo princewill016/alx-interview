@@ -1,35 +1,66 @@
-# Log Parsing Project
+#!/usr/bin/python3
+"""
+Script that reads stdin line by line and computes metrics
+"""
+import sys
+import re
 
-This project contains a Python script that parses log files and computes metrics.
 
-## 0-stats.py
+def print_stats(total_size, status_counts):
+    """Print the current statistics"""
+    print("File size: {}".format(total_size))
+    for status_code in sorted(status_counts.keys()):
+        print("{}: {}".format(status_code, status_counts[status_code]))
 
-A script that reads stdin line by line and computes the following metrics:
-- Total file size
-- Number of lines by status code (200, 301, 400, 401, 403, 404, 405, 500)
 
-### Input format
-The expected input format is:
-```
-<IP Address> - [<date>] "GET /projects/260 HTTP/1.1" <status code> <file size>
-```
-Lines that don't match this format are skipped.
+def parse_log_line(line):
+    """
+    Parse a log line and extract status code and file size
+    Returns (status_code, file_size) or (None, None) if invalid format
+    """
+    # Expected format: <IP> - [<date>] "GET /projects/260 HTTP/1.1" <status> <size>
+    pattern = r'^(\d+\.\d+\.\d+\.\d+) - \[(.*?)\] "GET /projects/260 HTTP/1\.1" (\d+) (\d+)$'
+    match = re.match(pattern, line.strip())
+    
+    if match:
+        try:
+            status_code = int(match.group(3))
+            file_size = int(match.group(4))
+            return status_code, file_size
+        except ValueError:
+            return None, None
+    return None, None
 
-### Output
-After every 10 lines and/or a keyboard interruption (CTRL + C), the script prints:
-- Total file size: `File size: <total size>`
-- Number of lines by status code in ascending order (only for codes that appear in the input)
 
-### Usage
-```
-cat logfile.txt | ./0-stats.py
-```
-Or pipe in data:
-```
-tail -f logfile.txt | ./0-stats.py
-```
+def main():
+    """Main function to process log lines"""
+    total_size = 0
+    status_counts = {}
+    valid_status_codes = {200, 301, 400, 401, 403, 404, 405, 500}
+    line_count = 0
+    
+    try:
+        for line in sys.stdin:
+            status_code, file_size = parse_log_line(line)
+            
+            if status_code is not None and file_size is not None:
+                # Add to total file size
+                total_size += file_size
+                
+                # Count status codes (only valid ones)
+                if status_code in valid_status_codes:
+                    status_counts[status_code] = status_counts.get(status_code, 0) + 1
+            
+            line_count += 1
+            
+            # Print stats every 10 lines
+            if line_count % 10 == 0:
+                print_stats(total_size, status_counts)
+                
+    except KeyboardInterrupt:
+        # Print final stats on keyboard interruption
+        print_stats(total_size, status_counts)
 
-### Requirements
-- Python 3.4.3
-- Ubuntu 20.04 LTS
-- PEP 8 style (version 1.7.x)
+
+if __name__ == "__main__":
+    main()
